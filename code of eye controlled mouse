@@ -1,0 +1,44 @@
+import cv2
+import mediapipe as mp
+import pyautogui
+
+# Setup
+screen_w, screen_h = pyautogui.size()
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True)  # iris landmarks enabled
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.flip(frame, 1)  # mirror view
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = face_mesh.process(rgb_frame)
+
+    if results.multi_face_landmarks:
+        landmarks = results.multi_face_landmarks[0].landmark
+
+        # Get iris center (right eye as example)
+        right_iris = [landmarks[i] for i in [474, 475, 476, 477]]
+        cx = int(sum([p.x for p in right_iris]) / 4 * screen_w)
+        cy = int(sum([p.y for p in right_iris]) / 4 * screen_h)
+
+        # Move the mouse
+        pyautogui.moveTo(cx, cy)
+
+        # Blink detection (simple: eyelid distance)
+        top = landmarks[159]  # upper eyelid
+        bottom = landmarks[145]  # lower eyelid
+        if (bottom.y - top.y) < 0.015:  # if eye closed
+            pyautogui.click()
+            pyautogui.sleep(0.2)  # prevent double click
+
+    cv2.imshow("Eye Controlled Mouse", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
